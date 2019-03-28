@@ -5,6 +5,12 @@ provider "aws" {
 }
 
 
+variable "ssh_keyname" {
+  description = "key name to use for SSH access"
+  default = "myssh"
+}
+
+
 output "public_ip" {  value = "${aws_instance.example.public_ip}"}
 output "public_ip1" {  value = "${aws_instance.example1.public_ip}"}
 
@@ -91,7 +97,8 @@ resource "aws_instance" "example" {
   instance_type = "t2.micro"
   security_groups= ["${aws_security_group.instance.id}"]
   subnet_id = "${aws_subnet.testsubnet.id}"
-  user_data_base64 ="IyEvYmluL2Jhc2gKeXVtIHVwZGF0ZSAteQp5dW0gaW5zdGFsbCBodHRwZCAteQp5dW0gY2xlYW4gYWxsIAoKZWNobyAiSGVsbG8gV29ybGQgdjIiID4gL3Zhci93d3cvaHRtbC9pbmRleC5odG1sCgpzeXN0ZW1jdGwgZW5hYmxlIGh0dHBkCnN5c3RlbWN0bCBzdGFydCBodHRwZAoKCg=="
+  key_name = "${var.ssh_keyname}"
+  user_data_base64 ="IyEvYmluL2Jhc2gKCiMgYWRkIGFuc2libGUgYW5kIGdpdAp5dW0tY29uZmlnLW1hbmFnZXIgLS1lbmFibGUgcmh1aS1SRUdJT04tcmhlbC1zZXJ2ZXItZXh0cmFzCnl1bSBpbnN0YWxsIGFuc2libGUgZ2l0IC15CgoKIyBjb25maWcgbm9kZSB2aWEgQW5zaWJsZQoKbWtkaXIgLXAgL29wdC9idWlsZApjZCAvb3B0L2J1aWxkCmdpdCBjbG9uZSBodHRwczovL2dpdGh1Yi5jb20vbWhjdXJsZWUvYW5zaWJsZS1idWlsZC5naXQKY2QgYW5zaWJsZS1idWlsZAphbnNpYmxlLXBsYXlib29rIGJ1aWxkLnltbAoKCg=="
   tags {
     Name = "testserver"
 
@@ -104,7 +111,8 @@ resource "aws_instance" "example1" {
   instance_type = "t2.micro"
   security_groups=["${aws_security_group.instance.id}"]
   subnet_id = "${aws_subnet.testsubnet.id}"
-  user_data_base64="IyEvYmluL2Jhc2gKeXVtIHVwZGF0ZSAteQp5dW0gaW5zdGFsbCBodHRwZCAteQp5dW0gY2xlYW4gYWxsIAoKZWNobyAiSGVsbG8gV29ybGQgdjIiID4gL3Zhci93d3cvaHRtbC9pbmRleC5odG1sCgpzeXN0ZW1jdGwgZW5hYmxlIGh0dHBkCnN5c3RlbWN0bCBzdGFydCBodHRwZAoKCg=="
+  key_name = "${var.ssh_keyname}"
+  user_data_base64 = "IyEvYmluL2Jhc2gKCiMgYWRkIGFuc2libGUgYW5kIGdpdAp5dW0tY29uZmlnLW1hbmFnZXIgLS1lbmFibGUgcmh1aS1SRUdJT04tcmhlbC1zZXJ2ZXItZXh0cmFzCnl1bSBpbnN0YWxsIGFuc2libGUgZ2l0IC15CgoKIyBjb25maWcgbm9kZSB2aWEgQW5zaWJsZQoKbWtkaXIgLXAgL29wdC9idWlsZApjZCAvb3B0L2J1aWxkCmdpdCBjbG9uZSBodHRwczovL2dpdGh1Yi5jb20vbWhjdXJsZWUvYW5zaWJsZS1idWlsZC5naXQKY2QgYW5zaWJsZS1idWlsZAphbnNpYmxlLXBsYXlib29rIGJ1aWxkLnltbAoKCg=="
   tags {
     Name = "testserver1"
 
