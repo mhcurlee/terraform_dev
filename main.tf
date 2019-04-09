@@ -10,32 +10,76 @@ variable "ssh_keyname" {
   default = "myssh"
 }
 
+variable "r53_zone_id" {
+description = "Route53 zone id"
+default = "Z1EEQ05I8FZVXC"
 
-output "public_ip" {  value = "${aws_instance.example.public_ip}"}
-output "public_ip1" {  value = "${aws_instance.example1.public_ip}"}
+}
 
 
-resource "aws_vpc" "testvpc" {
+variable "r53_fqdn" {
+  description = "FQDN for LB A record"
+  default = "web-demo.gocurlee.com"
+}
+
+
+
+
+#   Create VPC for app
+
+resource "aws_vpc" "webserver-vpc" {
   cidr_block       = "10.0.0.0/16"
 
   tags = {
-    Name = "testvpc"
+    Name = "webserver-vpc"
   }
 }
 
-resource "aws_subnet" "testsubnet" {
-  vpc_id = "${aws_vpc.testvpc.id}"
+#  Create Subnets in each AZ
+
+resource "aws_subnet" "testsubnet1" {
+  vpc_id = "${aws_vpc.webserver-vpc.id}"
+  availability_zone = "us-east-1a"
   cidr_block = "10.0.1.0/24"
   map_public_ip_on_launch = "true"
 
   tags = {
-    Name = "testsubnet"
+    Name = "testsubnet1"
   }
 
 }
 
+resource "aws_subnet" "testsubnet2" {
+  vpc_id = "${aws_vpc.webserver-vpc.id}"
+  availability_zone = "us-east-1b"
+  cidr_block = "10.0.2.0/24"
+  map_public_ip_on_launch = "true"
+
+  tags = {
+    Name = "testsubnet2"
+  }
+
+}
+
+
+resource "aws_subnet" "testsubnet3" {
+  vpc_id = "${aws_vpc.webserver-vpc.id}"
+  availability_zone = "us-east-1c"
+  cidr_block = "10.0.3.0/24"
+  map_public_ip_on_launch = "true"
+
+  tags = {
+    Name = "testsubnet3"
+  }
+
+}
+
+
+
+# creat IGW for VPC
+
 resource "aws_internet_gateway" "test_vpc_gw" {
-  vpc_id = "${aws_vpc.testvpc.id}"
+  vpc_id = "${aws_vpc.webserver-vpc.id}"
 
   tags = {
     Name = "testvpn_gw"
@@ -44,7 +88,7 @@ resource "aws_internet_gateway" "test_vpc_gw" {
 
 
 resource "aws_route_table"  "test_vpc_route_table" {
-  vpc_id = "${aws_vpc.testvpc.id}"
+  vpc_id = "${aws_vpc.webserver-vpc.id}"
   route {
     cidr_block = "0.0.0.0/0"
       gateway_id = "${aws_internet_gateway.test_vpc_gw.id}"
@@ -52,8 +96,17 @@ resource "aws_route_table"  "test_vpc_route_table" {
   }
 }
 
-resource "aws_route_table_association" "test_vpc_route_table_association" {
-  subnet_id      = "${aws_subnet.testsubnet.id}"
+resource "aws_route_table_association" "test_vpc_route_table_association1" {
+  subnet_id      = "${aws_subnet.testsubnet1.id}"
+  route_table_id = "${aws_route_table.test_vpc_route_table.id}"
+}
+
+resource "aws_route_table_association" "test_vpc_route_table_association2" {
+  subnet_id      = "${aws_subnet.testsubnet2.id}"
+  route_table_id = "${aws_route_table.test_vpc_route_table.id}"
+}
+resource "aws_route_table_association" "test_vpc_route_table_association3" {
+  subnet_id      = "${aws_subnet.testsubnet3.id}"
   route_table_id = "${aws_route_table.test_vpc_route_table.id}"
 }
 
@@ -61,20 +114,82 @@ resource "aws_route_table_association" "test_vpc_route_table_association" {
 
 
 
-resource "aws_security_group" "instance" {
-    name = "webserver_sec_grp" 
-    vpc_id = "${aws_vpc.testvpc.id}" 
-    ingress {    
-      from_port   = 80    
-      to_port     = 80   
-      protocol    = "tcp"    
-      cidr_blocks = ["0.0.0.0/0"]  }
+resource "aws_launch_template" "lt-webserver" {
+  image_id  = "ami-011b3ccf1bd6db744"
+  instance_type  = "t2.micro"
+  key_name = "${var.ssh_keyname}"
+  vpc_security_group_ids = ["${aws_security_group.elb.id}", "${aws_security_group.webservers_base.id}"]
+  user_data ="IyEvYmluL2Jhc2gKCiMgYWRkIGFuc2libGUgYW5kIGdpdAp5dW0tY29uZmlnLW1hbmFnZXIgLS1lbmFibGUgcmh1aS1SRUdJT04tcmhlbC1zZXJ2ZXItZXh0cmFzCnl1bSBpbnN0YWxsIGFuc2libGUgZ2l0IC15CgoKIyBjb25maWcgbm9kZSB2aWEgQW5zaWJsZQoKbWtkaXIgLXAgL29wdC9idWlsZApjZCAvb3B0L2J1aWxkCmdpdCBjbG9uZSBodHRwczovL2dpdGh1Yi5jb20vbWhjdXJsZWUvYW5zaWJsZS1idWlsZC5naXQKY2QgYW5zaWJsZS1idWlsZAphbnNpYmxlLXBsYXlib29rIGJ1aWxkLnltbAoKCg=="
+  
 
+}
+
+resource "aws_alb"  "webserver-al"  {
+
+name               = "webserver-lb-tf"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = ["${aws_security_group.elb.id}", "${aws_security_group.webservers_base.id}"]
+  subnets            = ["${aws_subnet.testsubnet1.id}", "${aws_subnet.testsubnet2.id}", "${aws_subnet.testsubnet3.id}"]
+
+}
+
+
+resource "aws_lb_listener" "front_end" {
+  load_balancer_arn = "${aws_alb.webserver-al.arn}"
+  port              = "80"
+  protocol          = "HTTP"
+  
+  default_action {
+    type             = "forward"
+    target_group_arn = "${aws_alb_target_group.webservers-targets.arn}"
+  }
+}
+
+
+
+resource "aws_alb_target_group" "webservers-targets" {
+  name     = "webserver-targets"
+  vpc_id = "${aws_vpc.webserver-vpc.id}"
+  port     = 80
+  protocol = "HTTP"
+  
+}
+
+
+resource "aws_autoscaling_group" "webserver-asg" {
+  availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
+  vpc_zone_identifier = ["${aws_subnet.testsubnet1.id}", "${aws_subnet.testsubnet2.id}", "${aws_subnet.testsubnet3.id}"]
+  desired_capacity   = 3
+  max_size           = 6
+  min_size           = 3
+
+  launch_template {
+    id      = "${aws_launch_template.lt-webserver.id}"
+    
+  }
+}
+
+
+
+resource "aws_autoscaling_attachment" "asg_attachment_webservers" {
+  autoscaling_group_name = "${aws_autoscaling_group.webserver-asg.id}"
+  alb_target_group_arn   = "${aws_alb_target_group.webservers-targets.arn}"
+}
+
+
+
+
+resource "aws_security_group" "webservers_base" {
+    name = "webserver_sec_grp" 
+    vpc_id = "${aws_vpc.webserver-vpc.id}" 
+    
     ingress {    
       from_port   = 22    
       to_port     = 22   
       protocol    = "tcp"    
-      cidr_blocks = ["0.0.0.0/0"]  }  
+      cidr_blocks = ["0.0.0.0/0"]  
+    }  
 
      egress {
       from_port       = 0
@@ -83,43 +198,28 @@ resource "aws_security_group" "instance" {
       cidr_blocks     = ["0.0.0.0/0"]
     
   }
+}
 
 
+resource "aws_security_group" "elb" {
+  name = "webserver_elb_80"
+  vpc_id = "${aws_vpc.webserver-vpc.id}"
 
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+}
+
+
+resource "aws_route53_record" "web-demo" {
+  zone_id = "${var.r53_zone_id}"
+  name    = "${var.r53_fqdn}"
+  type    = "CNAME"
+  ttl = "300"
+  records = [ "${aws_alb.webserver-al.dns_name}"]
   
- 
-}
-
-
-
-resource "aws_instance" "example" {
-  ami           = "ami-011b3ccf1bd6db744"
-  instance_type = "t2.micro"
-  security_groups= ["${aws_security_group.instance.id}"]
-  subnet_id = "${aws_subnet.testsubnet.id}"
-  key_name = "${var.ssh_keyname}"
-  user_data_base64 ="IyEvYmluL2Jhc2gKCiMgYWRkIGFuc2libGUgYW5kIGdpdAp5dW0tY29uZmlnLW1hbmFnZXIgLS1lbmFibGUgcmh1aS1SRUdJT04tcmhlbC1zZXJ2ZXItZXh0cmFzCnl1bSBpbnN0YWxsIGFuc2libGUgZ2l0IC15CgoKIyBjb25maWcgbm9kZSB2aWEgQW5zaWJsZQoKbWtkaXIgLXAgL29wdC9idWlsZApjZCAvb3B0L2J1aWxkCmdpdCBjbG9uZSBodHRwczovL2dpdGh1Yi5jb20vbWhjdXJsZWUvYW5zaWJsZS1idWlsZC5naXQKY2QgYW5zaWJsZS1idWlsZAphbnNpYmxlLXBsYXlib29rIGJ1aWxkLnltbAoKCg=="
-  tags {
-    Name = "testserver"
-
   }
-
-}
-
-resource "aws_instance" "example1" {
-  ami           = "ami-011b3ccf1bd6db744"
-  instance_type = "t2.micro"
-  security_groups=["${aws_security_group.instance.id}"]
-  subnet_id = "${aws_subnet.testsubnet.id}"
-  key_name = "${var.ssh_keyname}"
-  user_data_base64 = "IyEvYmluL2Jhc2gKCiMgYWRkIGFuc2libGUgYW5kIGdpdAp5dW0tY29uZmlnLW1hbmFnZXIgLS1lbmFibGUgcmh1aS1SRUdJT04tcmhlbC1zZXJ2ZXItZXh0cmFzCnl1bSBpbnN0YWxsIGFuc2libGUgZ2l0IC15CgoKIyBjb25maWcgbm9kZSB2aWEgQW5zaWJsZQoKbWtkaXIgLXAgL29wdC9idWlsZApjZCAvb3B0L2J1aWxkCmdpdCBjbG9uZSBodHRwczovL2dpdGh1Yi5jb20vbWhjdXJsZWUvYW5zaWJsZS1idWlsZC5naXQKY2QgYW5zaWJsZS1idWlsZAphbnNpYmxlLXBsYXlib29rIGJ1aWxkLnltbAoKCg=="
-  tags {
-    Name = "testserver1"
-
-  }
-
-}
-
-
-
-
