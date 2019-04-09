@@ -158,7 +158,6 @@ resource "aws_alb_target_group" "webservers-targets" {
 
 
 resource "aws_autoscaling_group" "webserver-asg" {
-  availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
   vpc_zone_identifier = ["${aws_subnet.testsubnet1.id}", "${aws_subnet.testsubnet2.id}", "${aws_subnet.testsubnet3.id}"]
   desired_capacity   = 3
   max_size           = 6
