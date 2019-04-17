@@ -5,6 +5,8 @@ provider "aws" {
 }
 
 
+#  vars section
+
 variable "ssh_keyname" {
   description = "key name to use for SSH access"
   default = "myssh"
@@ -19,9 +21,19 @@ default = "Z1EEQ05I8FZVXC"
 
 variable "r53_fqdn" {
   description = "FQDN for LB A record"
-  default = "web-demo.gocurlee.com"
+  default = "mydemo.gocurlee.com"
 }
 
+
+variable "scale_min" {
+  description = "min number of nodes in scale group"
+  default = 2
+}
+
+variable "scale_max" {
+  description = "max number of nodes in scale group"
+  default = 6
+}
 
 
 
@@ -159,14 +171,15 @@ resource "aws_alb_target_group" "webservers-targets" {
 
 resource "aws_autoscaling_group" "webserver-asg" {
   vpc_zone_identifier = ["${aws_subnet.testsubnet1.id}", "${aws_subnet.testsubnet2.id}", "${aws_subnet.testsubnet3.id}"]
-  desired_capacity   = 3
-  max_size           = 6
-  min_size           = 3
+  desired_capacity   = "${var.scale_min}"
+  max_size           = "${var.scale_max}"
+  min_size           = "${var.scale_min}"
 
   launch_template {
     id      = "${aws_launch_template.lt-webserver.id}"
     
   }
+
 }
 
 
