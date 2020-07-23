@@ -21,7 +21,7 @@ variable "r53_fqdn" {
 
 variable "scale_min" {
   description = "min number of nodes in scale group"
-  default     = 2
+  default     = 3
 }
 
 variable "scale_max" {
